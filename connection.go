@@ -48,9 +48,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vertica/vertica-sql-go/common"
-	"github.com/vertica/vertica-sql-go/logger"
-	"github.com/vertica/vertica-sql-go/msgs"
+	"github.com/watercraft/vertica-sql-go/common"
+	"github.com/watercraft/vertica-sql-go/logger"
+	"github.com/watercraft/vertica-sql-go/msgs"
 )
 
 var (

@@ -45,8 +45,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vertica/vertica-sql-go/common"
-	"github.com/vertica/vertica-sql-go/msgs"
+	"github.com/watercraft/vertica-sql-go/common"
+	"github.com/watercraft/vertica-sql-go/msgs"
 )
 
 type rows struct {
