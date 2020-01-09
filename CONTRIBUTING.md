@@ -8,14 +8,14 @@ This document will guide you through the contribution process. There are a numbe
  
 # Bug Reports
 
-If you find a bug, submit an [issue](https://github.com/vertica/vertica-sql-go/issues) with a complete and reproducible bug report. If the issue can't be reproduced, it will be closed. If you opened an issue, but figured out the answer later on your own, comment on the issue to let people know, then close the issue.
+If you find a bug, submit an [issue](https://github.com/watercraft/vertica-sql-go/issues) with a complete and reproducible bug report. If the issue can't be reproduced, it will be closed. If you opened an issue, but figured out the answer later on your own, comment on the issue to let people know, then close the issue.
 
 For issues (e.g. security related issues) that are **not suitable** to be reported publicly on the GitHub issue system, report your issues to [Vertica team](mailto:vertica-opensrc@microfocus.com) directly or file a case with Vertica support if you have a support account.
 
 # Feature Requests
 
 Feel free to share your ideas for how to improve *vertica-sql-go*. We’re always open to suggestions.
-You can open an [issue](https://github.com/vertica/vertica-sql-go/issues)
+You can open an [issue](https://github.com/watercraft/vertica-sql-go/issues)
 with details describing what feature(s) you'd like added or changed.
 
 If you would like to implement the feature yourself, open an issue to ask before working on it. Once approved, please refer to the [Code Contributions](#code-contributions) section.
@@ -33,7 +33,7 @@ git config --global user.email "email@example.com"
 
 ## Step 1: Fork
 
-Fork the project [on Github](https://github.com/vertica/vertica-sql-go) and check out your copy locally.
+Fork the project [on Github](https://github.com/watercraft/vertica-sql-go) and check out your copy locally.
 
 ```shell
 git clone git@github.com:YOURUSERNAME/vertica-sql-go.git

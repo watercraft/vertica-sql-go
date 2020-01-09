@@ -8,7 +8,7 @@ go:
   - 1.12.x
   - master
 
-go_import_path: github.com/vertica/vertica-sql-go
+go_import_path: github.com/watercraft/vertica-sql-go
 
 before_install:
   - git clone https://github.com/jbfavre/docker-vertica.git

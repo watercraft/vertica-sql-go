@@ -1,12 +1,12 @@
 # vertica-sql-go
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](https://opensource.org/licenses/Apache-2.0)
-[![GoDoc](https://godoc.org/github.com/vertica/vertica-sql-go?status.svg)](https://godoc.org/github.com/vertica/vertica-sql-go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/vertica/vertica-sql-go)](https://goreportcard.com/report/github.com/vertica/vertica-sql-go)
+[![GoDoc](https://godoc.org/github.com/watercraft/vertica-sql-go?status.svg)](https://godoc.org/github.com/watercraft/vertica-sql-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/watercraft/vertica-sql-go)](https://goreportcard.com/report/github.com/watercraft/vertica-sql-go)
 
 vertica-sql-go is a native Go adapter for the Vertica (http://www.vertica.com) database.
 
-Please check out [release notes](https://github.com/vertica/vertica-sql-go/releases) to learn about the latest improvements.
+Please check out [release notes](https://github.com/watercraft/vertica-sql-go/releases) to learn about the latest improvements.
 
 vertica-sql-go is currently in alpha stage; it has been tested for functionality and has a very basic test suite. Please use with caution, and feel free to submit issues and/or pull requests (Read up on our [contributing guidelines](#contributing-guidelines)).
 
@@ -21,12 +21,12 @@ vertica-sql-go has been tested with Vertica 9.2.0+ and Go 1.11.2.
 
 Source code for vertica-sql-go can be found at:
 
-    https://github.com/vertica/vertica-sql-go
+    https://github.com/watercraft/vertica-sql-go
 
 Alternatively you can use the 'go get' variant to install the package into your local Go environment.
 
 ```sh
-go get github.com/vertica/vertica-sql-go
+go get github.com/watercraft/vertica-sql-go
 ```
 
 
@@ -42,7 +42,7 @@ First ensure that you have the library checked out in your standard Go hierarchy
 import (
     "context"
     "database/sql"
-    "github.com/vertica/vertica-sql-go"
+    "github.com/watercraft/vertica-sql-go"
 )
 ```
 
@@ -303,8 +303,8 @@ import (
     "database/sql"
     "os"
 
-    _ "github.com/vertica/vertica-sql-go"
-    "github.com/vertica/vertica-sql-go/logger"
+    _ "github.com/watercraft/vertica-sql-go"
+    "github.com/watercraft/vertica-sql-go/logger"
 )
 
 func main() {
