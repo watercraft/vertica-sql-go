@@ -161,7 +161,7 @@ func (r *rows) Next(dest []driver.Value) error {
 		case common.ColTypeBoolean: // to boolean
 			dest[idx] = colVal[0] == 't'
 		case common.ColTypeInt64: // to integer
-			dest[idx], _ = strconv.Atoi(string(colVal))
+			dest[idx], _ = strconv.ParseInt(string(colVal), 10, 64)
 		case common.ColTypeVarChar, common.ColTypeLongVarChar, common.ColTypeChar, common.ColTypeUUID: // stays string, convert char to string
 			dest[idx] = string(colVal)
 		case common.ColTypeFloat64, common.ColTypeNumeric: // to float64
