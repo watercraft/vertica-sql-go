@@ -162,6 +162,14 @@ func newConnection(connString string) (*connection, error) {
 		return nil, fmt.Errorf("cannot connect to %s (%s)", result.connURL.Host, err.Error())
 	}
 
+	// Load Balancing
+	loadbalance := strings.ToLower(result.connURL.Query().Get("loadbalance"))
+	if loadbalance == "1" {
+		if err = result.balanceLoad(); err != nil {
+			return nil, err
+		}
+	}
+
 	if sslFlag != "none" {
 		if err = result.initializeSSL(sslFlag); err != nil {
 			return nil, err
@@ -481,4 +489,39 @@ func (v *connection) lockSessionMutex() {
 
 func (v *connection) unlockSessionMutex() {
 	v.sessMutex.Unlock()
+}
+
+func (v *connection) balanceLoad() error {
+
+	if err := v.sendMessage(&msgs.FELoadBalanceMsg{}); err != nil {
+		return err
+	}
+
+	bMsg, err := v.recvMessage()
+	if err != nil {
+		return err
+	}
+
+	switch msg := bMsg.(type) {
+	case *msgs.BEErrorMsg:
+		return msg.ToErrorType()
+	case *msgs.BELoadBalanceMsg:
+		v.conn.Close()
+		newURL, err := url.Parse(fmt.Sprintf("vertica://%s:%d", msg.Host, msg.Port))
+		if err != nil {
+			return err
+		}
+		v.conn, err = net.Dial("tcp", newURL.Host)
+		if err != nil {
+			return fmt.Errorf("cannot connect to %s (%s)", newURL.Host, err.Error())
+		}
+		return nil
+	default:
+		_, err = v.defaultMessageHandler(msg)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
