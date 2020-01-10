@@ -44,6 +44,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -163,8 +164,8 @@ func newConnection(connString string) (*connection, error) {
 	}
 
 	// Load Balancing
-	loadbalance := strings.ToLower(result.connURL.Query().Get("loadbalance"))
-	if loadbalance == "1" {
+	loadbalance, _ := strconv.Atoi(result.connURL.Query().Get("loadbalance"))
+	if loadbalance > 0 {
 		if err = result.balanceLoad(); err != nil {
 			return nil, err
 		}
