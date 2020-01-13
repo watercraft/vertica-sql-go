@@ -506,7 +506,7 @@ func (v *connection) balanceLoad() error {
 	switch msg := bMsg.(type) {
 	case *msgs.BEErrorMsg:
 		return msg.ToErrorType()
-	case *msgs.BELoadBalanceMsg:
+	case *msgs.BELoadBalanceSuccessMsg:
 		v.conn.Close()
 		newURL, err := url.Parse(fmt.Sprintf("vertica://%s:%d", msg.Host, msg.Port))
 		if err != nil {
@@ -516,6 +516,9 @@ func (v *connection) balanceLoad() error {
 		if err != nil {
 			return fmt.Errorf("cannot connect to %s (%s)", newURL.Host, err.Error())
 		}
+		return nil
+	case *msgs.BELoadBalanceFailMsg:
+		// keep existing connection
 		return nil
 	default:
 		_, err = v.defaultMessageHandler(msg)

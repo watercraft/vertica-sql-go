@@ -36,16 +36,16 @@ import (
 	"fmt"
 )
 
-// BELoadBalanceMsg docs
-type BELoadBalanceMsg struct {
+// BELoadBalanceSuccessMsg docs
+type BELoadBalanceSuccessMsg struct {
 	Port uint32
 	Host string
 }
 
 // CreateFromMsgBody docs
-func (m *BELoadBalanceMsg) CreateFromMsgBody(buf *msgBuffer) (BackEndMsg, error) {
+func (m *BELoadBalanceSuccessMsg) CreateFromMsgBody(buf *msgBuffer) (BackEndMsg, error) {
 
-	res := &BELoadBalanceMsg{
+	res := &BELoadBalanceSuccessMsg{
 		Port: buf.readUint32(),
 		Host: buf.readString(),
 	}
@@ -53,10 +53,26 @@ func (m *BELoadBalanceMsg) CreateFromMsgBody(buf *msgBuffer) (BackEndMsg, error)
 	return res, nil
 }
 
-func (m *BELoadBalanceMsg) String() string {
-	return fmt.Sprintf("LoadBalance: %s:%d", m.Host, m.Port)
+func (m *BELoadBalanceSuccessMsg) String() string {
+	return fmt.Sprintf("LoadBalance Success: %s:%d", m.Host, m.Port)
+}
+
+// BELoadBalanceFailMsg docs
+type BELoadBalanceFailMsg struct{}
+
+// CreateFromMsgBody docs
+func (m *BELoadBalanceFailMsg) CreateFromMsgBody(buf *msgBuffer) (BackEndMsg, error) {
+
+	res := &BELoadBalanceFailMsg{}
+
+	return res, nil
+}
+
+func (m *BELoadBalanceFailMsg) String() string {
+	return fmt.Sprintf("LoadBalance Fail")
 }
 
 func init() {
-	registerBackEndMsgType('Y', &BELoadBalanceMsg{})
+	registerBackEndMsgType('Y', &BELoadBalanceSuccessMsg{})
+	registerBackEndMsgType('N', &BELoadBalanceFailMsg{})
 }
