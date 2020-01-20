@@ -75,9 +75,9 @@ func (m *FEBindMsg) Flatten() ([]byte, byte) {
 			strVal = v
 		case bool:
 			if v {
-				strVal = "t"
+				strVal = "1"
 			} else {
-				strVal = "f"
+				strVal = "0"
 			}
 		case time.Time:
 			strVal = v.Format("2006-01-02T15:04:05.999999Z07:00")
