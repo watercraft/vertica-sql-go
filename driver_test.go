@@ -44,7 +44,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/watercraft/vertica-sql-go/logger"
+	"github.com/vertica/vertica-sql-go/logger"
 )
 
 var (
@@ -194,6 +194,32 @@ func TestBasicQuery(t *testing.T) {
 		testLogger.Debug("\"%s\": true,", keyword)
 	}
 
+}
+
+func TestBasicNamedArgs(t *testing.T) {
+	connDB := openConnection(t)
+	defer closeConnection(t, connDB)
+	rows, err := connDB.QueryContext(ctx, "SELECT DISTINCT(keyword) FROM v_catalog.standard_keywords WHERE reserved=@type LIMIT 10", sql.Named("type", "R"))
+	assertNoErr(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var keyword string
+		assertNoErr(t, rows.Scan(&keyword))
+	}
+}
+
+func TestPreparedNamedArgs(t *testing.T) {
+	connDB := openConnection(t)
+	defer closeConnection(t, connDB)
+	stmt, err := connDB.PrepareContext(ctx, "SELECT DISTINCT(keyword) FROM v_catalog.standard_keywords WHERE reserved=@type LIMIT 10")
+	assertNoErr(t, err)
+	rows, err := stmt.QueryContext(ctx, sql.Named("type", "R"))
+	assertNoErr(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var keyword string
+		assertNoErr(t, rows.Scan(&keyword))
+	}
 }
 
 func TestBasicExec(t *testing.T) {
@@ -478,7 +504,7 @@ func TestValueTypes(t *testing.T) {
 }
 
 // Issue 17 : Reusing prepared statements throws runtime errors
-// https://github.com/watercraft/vertica-sql-go/issues/17
+// https://github.com/vertica/vertica-sql-go/issues/17
 func TestStmtReuseBug(t *testing.T) {
 	connDB := openConnection(t)
 	defer closeConnection(t, connDB)
@@ -512,7 +538,7 @@ func TestStmtReuseBug(t *testing.T) {
 }
 
 // Issue 20 : No columns returned when query returns no rows
-// https://github.com/watercraft/vertica-sql-go/issues/20
+// https://github.com/vertica/vertica-sql-go/issues/20
 func TestColumnsWithNoRows(t *testing.T) {
 	connDB := openConnection(t)
 	defer closeConnection(t, connDB)
@@ -541,7 +567,7 @@ type threadedQuery struct {
 }
 
 // Issue 22 : Possible issue with wrong rows returned from current stmt results
-// https://github.com/watercraft/vertica-sql-go/issues/22
+// https://github.com/vertica/vertica-sql-go/issues/22
 func TestStmtOrderingInThreads(t *testing.T) {
 	connDB := openConnection(t, "test_stmt_ordering_threads_pre")
 	connDB.SetMaxOpenConns(1)
@@ -603,7 +629,7 @@ func TestStmtOrderingInThreads(t *testing.T) {
 }
 
 // Issue 9 : Does it support COPY FROM / COPY TO ?
-// https://github.com/watercraft/vertica-sql-go/issues/9
+// https://github.com/vertica/vertica-sql-go/issues/9
 func TestSTDINCopy(t *testing.T) {
 	connDB := openConnection(t, "test_stdin_copy_pre")
 	defer closeConnection(t, connDB, "test_stdin_copy_post")
@@ -646,7 +672,7 @@ func TestSTDINCopy(t *testing.T) {
 }
 
 // Issue 9 : Does it support COPY FROM / COPY TO ?
-// https://github.com/watercraft/vertica-sql-go/issues/9
+// https://github.com/vertica/vertica-sql-go/issues/9
 func TestSTDINCopyWithStream(t *testing.T) {
 	connDB := openConnection(t, "test_stdin_copy_pre")
 	defer closeConnection(t, connDB, "test_stdin_copy_post")
@@ -689,7 +715,7 @@ func TestSTDINCopyWithStream(t *testing.T) {
 }
 
 // Issue 44 : error during parsing of prepared statement causes perpetual error state
-// https://github.com/watercraft/vertica-sql-go/issues/44
+// https://github.com/vertica/vertica-sql-go/issues/44
 func TestHangAfterError(t *testing.T) {
 	connDB := openConnection(t)
 	defer closeConnection(t, connDB)
@@ -741,7 +767,7 @@ func testEnableResultCachePageSized(t *testing.T, connDB *sql.DB, ctx VerticaCon
 }
 
 // Issue 43 : response batching / cursor / lazy queries
-// https://github.com/watercraft/vertica-sql-go/issues/43
+// https://github.com/vertica/vertica-sql-go/issues/43
 func TestEnableResultCache(t *testing.T) {
 	connDB := openConnection(t, "test_enable_result_cache_pre")
 	defer closeConnection(t, connDB, "test_enable_result_cache_post")
@@ -752,6 +778,27 @@ func TestEnableResultCache(t *testing.T) {
 	testEnableResultCachePageSized(t, connDB, vCtx, 5)
 	testEnableResultCachePageSized(t, connDB, vCtx, 49)
 	testEnableResultCachePageSized(t, connDB, vCtx, 0)
+}
+
+func TestConnectionClosure(t *testing.T) {
+	adminDB := openConnection(t, "test_connection_closed_pre")
+	defer closeConnection(t, adminDB, "test_connection_closed_post")
+	const userQuery = "select 1 as test"
+
+	userDB, _ := sql.Open("vertica", otherConnectString)
+	defer userDB.Close()
+	rows, err := userDB.Query(userQuery)
+	assertNoErr(t, err)
+	rows.Close()
+	adminDB.Query("select close_user_sessions('TestGuy')")
+	rows, err = userDB.Query(userQuery)
+	// Depending on Go version this second query may or may not error
+	if err == nil {
+		rows.Close()
+	}
+	rows, err = userDB.Query(userQuery)
+	assertNoErr(t, err) // Should definitely have a working connection again here
+	rows.Close()
 }
 
 var verticaUserName = flag.String("user", "dbadmin", "the user name to connect to Vertica")

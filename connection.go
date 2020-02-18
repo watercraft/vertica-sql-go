@@ -40,7 +40,6 @@ import (
 	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"os"
@@ -69,12 +68,11 @@ type connection struct {
 	backendPID       uint32
 	cancelKey        uint32
 	transactionState byte
-	authState        int32
 	usePreparedStmts bool
+	scratch          [512]byte
 	sessionID        string
 	serverTZOffset   string
 	sessMutex        sync.Mutex
-	inputStream      io.Reader
 }
 
 // Begin - Begin starts and returns a new transaction. (DEPRECATED)
@@ -130,6 +128,33 @@ func (v *connection) PrepareContext(ctx context.Context, query string) (driver.S
 // From interface: sql.driver.Conn
 func (v *connection) Prepare(query string) (driver.Stmt, error) {
 	return v.PrepareContext(context.Background(), query)
+}
+
+// Ping implements the Pinger interface for connection. Use this to check for a valid connection state.
+// This has to prepare AND execute the query in case prepared statements are disabled.
+func (v *connection) Ping(ctx context.Context) error {
+	stmt, err := v.PrepareContext(ctx, "select 1 as test")
+	if err != nil {
+		return driver.ErrBadConn
+	}
+	defer stmt.Close()
+	// If we are preparing statements server side, successfully preparing verifies the connection
+	if v.usePreparedStmts {
+		return nil
+	}
+	queryContext := stmt.(driver.StmtQueryContext)
+	rows, err := queryContext.QueryContext(ctx, nil)
+	if err != nil {
+		return driver.ErrBadConn
+	}
+	rows.Close()
+	return nil
+}
+
+// ResetSession implements the SessionResetter interface for connection. This allows the sql
+// package to evaluate the connection state when managing the connection pool.
+func (v *connection) ResetSession(ctx context.Context) error {
+	return v.Ping(ctx)
 }
 
 // newConnection constructs a new Vertica Connection object based on the connection string.
@@ -189,40 +214,44 @@ func newConnection(connString string) (*connection, error) {
 }
 
 func (v *connection) recvMessage() (msgs.BackEndMsg, error) {
-	msgHeader := make([]byte, 5)
+	msgHeader := v.scratch[:5]
 
-	for {
-		var err error
+	var err error
 
-		if err = v.readAll(msgHeader); err != nil {
-			return nil, err
-		}
-
-		msgSize := int(binary.BigEndian.Uint32(msgHeader[1:]) - 4)
-
-		msgBytes := make([]byte, msgSize)
-
-		if msgSize > 0 {
-			if err = v.readAll(msgBytes); err != nil {
-				return nil, err
-			}
-		}
-
-		bem, err := msgs.CreateBackEndMsg(msgHeader[0], msgBytes)
-
-		if err != nil {
-			return nil, err
-		}
-
-		// Print the message to stdout (for debugging purposes)
-		if _, drm := bem.(*msgs.BEDataRowMsg); !drm {
-			connectionLogger.Debug("<- " + bem.String())
-		} else {
-			connectionLogger.Trace("<- " + bem.String())
-		}
-
-		return bem, nil
+	if err = v.readAll(msgHeader); err != nil {
+		return nil, err
 	}
+
+	msgSize := int(binary.BigEndian.Uint32(msgHeader[1:]) - 4)
+
+	msgBytes := v.scratch[5:]
+
+	var y []byte
+	if msgSize > 0 {
+		if msgSize <= len(msgBytes) {
+			y = msgBytes[:msgSize]
+		} else {
+			y = make([]byte, msgSize)
+		}
+		if err = v.readAll(y); err != nil {
+			return nil, err
+		}
+	}
+
+	bem, err := msgs.CreateBackEndMsg(msgHeader[0], y)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Print the message to stdout (for debugging purposes)
+	if _, drm := bem.(*msgs.BEDataRowMsg); !drm {
+		connectionLogger.Debug("<- " + bem.String())
+	} else {
+		connectionLogger.Trace("<- " + bem.String())
+	}
+
+	return bem, nil
 }
 
 func (v *connection) sendMessage(msg msgs.FrontEndMsg) error {
@@ -235,7 +264,7 @@ func (v *connection) sendMessage(msg msgs.FrontEndMsg) error {
 	}
 
 	if result == nil {
-		sizeBytes := make([]byte, 4)
+		sizeBytes := v.scratch[:4]
 		binary.BigEndian.PutUint32(sizeBytes, uint32(len(msgBytes)+4))
 
 		_, result = v.conn.Write(sizeBytes)
@@ -336,7 +365,8 @@ func (v *connection) initializeSession() error {
 	}
 
 	// Peek into the results manually.
-	str := string(result.resultData[0].RowData[0])
+	colData := result.resultData[0].Columns()
+	str := string(colData.Chunk())
 
 	if len(str) < 23 {
 		return fmt.Errorf("can't get server timezone: %s", str)
@@ -402,7 +432,7 @@ func (v *connection) readAll(buf []byte) error {
 func (v *connection) initializeSSL(sslFlag string) error {
 	v.sendMessage(&msgs.FESSLMsg{})
 
-	buf := make([]byte, 1)
+	buf := v.scratch[:1]
 
 	err := v.readAll(buf)
 

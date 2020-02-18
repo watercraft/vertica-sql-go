@@ -79,11 +79,11 @@ func (m *FEBindMsg) Flatten() ([]byte, byte) {
 			} else {
 				strVal = "0"
 			}
-		case time.Time:
-			strVal = v.Format("2006-01-02T15:04:05.999999Z07:00")
 		case sql.NullBool, sql.NullFloat64, sql.NullInt64, sql.NullString:
 			buf.appendUint32(0xffffffff)
 			continue
+		case time.Time:
+			strVal = v.Format("2006-01-02T15:04:05.999999Z07:00")
 		default:
 			strVal = "??HELP??"
 		}

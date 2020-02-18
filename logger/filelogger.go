@@ -32,7 +32,11 @@ package logger
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import "os"
+import (
+	"fmt"
+	"os"
+	"time"
+)
 
 type FileLogger struct {
 	fp *os.File
@@ -48,11 +52,13 @@ func NewFileLogger(filename string) (*FileLogger, error) {
 	return &FileLogger{fp: file}, nil
 }
 
-func (l *FileLogger) write(logStr string) {
-	l.fp.Write([]byte(logStr))
+func (l *FileLogger) Write(prefix string, name string, msg string) {
+	l.fp.Write([]byte(time.Now().Format(time.StampMicro)))
+	l.fp.Write([]byte(fmt.Sprintf(" %s %s: ", prefix, name)))
+	l.fp.Write([]byte(msg + "\n"))
 }
 
-func (l *FileLogger) close() {
+func (l *FileLogger) Close() {
 	if l.fp != nil {
 		l.fp.Close()
 	}
