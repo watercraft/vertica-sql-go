@@ -157,6 +157,9 @@ func (v *connection) ResetSession(ctx context.Context) error {
 	return v.Ping(ctx)
 }
 
+// Custome dialer parameters
+var dialer = &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 5 * time.Second}
+
 // newConnection constructs a new Vertica Connection object based on the connection string.
 func newConnection(connString string) (*connection, error) {
 
@@ -182,7 +185,7 @@ func newConnection(connString string) (*connection, error) {
 		sslFlag = "none"
 	}
 
-	result.conn, err = net.Dial("tcp", result.connURL.Host)
+	result.conn, err = dialer.Dial("tcp", result.connURL.Host)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to %s (%s)", result.connURL.Host, err.Error())
@@ -542,7 +545,7 @@ func (v *connection) balanceLoad() error {
 		if err != nil {
 			return err
 		}
-		v.conn, err = net.Dial("tcp", newURL.Host)
+		v.conn, err = dialer.Dial("tcp", newURL.Host)
 		if err != nil {
 			return fmt.Errorf("cannot connect to %s (%s)", newURL.Host, err.Error())
 		}
