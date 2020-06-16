@@ -158,7 +158,7 @@ func (v *connection) ResetSession(ctx context.Context) error {
 }
 
 // Custome dialer parameters
-var dialer = &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 5 * time.Second}
+var dialer = &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 4 * time.Second}
 
 // newConnection constructs a new Vertica Connection object based on the connection string.
 func newConnection(connString string) (*connection, error) {
