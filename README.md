@@ -8,27 +8,19 @@ vertica-sql-go is a native Go adapter for the Vertica (http://www.vertica.com) d
 
 Please check out [release notes](https://github.com/watercraft/vertica-sql-go/releases) to learn about the latest improvements.
 
-vertica-sql-go is currently in alpha stage; it has been tested for functionality and has a very basic test suite. Please use with caution, and feel free to submit issues and/or pull requests (Read up on our [contributing guidelines](#contributing-guidelines)).
-
 vertica-sql-go has been tested with Vertica 9.2.0+ and Go 1.11.2.
-
-## Release Notes
-
-* As this driver is still in alpha stage, we reserve the right to break APIs and change functionality until it has been stablilized.
-
 
 ## Installation
 
 Source code for vertica-sql-go can be found at:
 
-    https://github.com/watercraft/vertica-sql-go
+https://github.com/vertica/vertica-sql-go
 
 Alternatively you can use the 'go get' variant to install the package into your local Go environment.
 
 ```sh
-go get github.com/watercraft/vertica-sql-go
+go get github.com/vertica/vertica-sql-go
 ```
-
 
 ## Usage
 
@@ -61,21 +53,26 @@ The vertica-sql-go driver supports multiple log levels, as defined in the follow
 | 6               | NONE           | Disable all log messages |
 
 and they can be set programmatically by calling the logger global level itself
+
 ```Go
 logger.SetLogLevel(logger.DEBUG)
 ```
+
 or by setting the environment variable VERTICA_SQL_GO_LOG_LEVEL to one of the integer values in the table above. This must be done before the process using the driver has started as the global log level will be read from here on start-up.
 
 Example:
+
 ```bash
 export VERTICA_SQL_GO_LOG_LEVEL=3
 ```
+
 ### Setting the Log File
 
 By default, log messages are sent to stdout, but the vertica-sql-go driver can also output to a file in cases where stdout is not available.
 Simply set the environment variable VERTICA_SQL_GO_LOG_FILE to your desired output location.
 
 Example:
+
 ```bash
 export VERTICA_SQL_GO_LOG_FILE=/var/log/vertica-sql-go.log
 ``` 
@@ -85,17 +82,21 @@ export VERTICA_SQL_GO_LOG_FILE=/var/log/vertica-sql-go.log
 ```Go
 connDB, err := sql.Open("vertica", myDBConnectString)
 ```
+
 where *myDBConnectString* is of the form:
 
-```
+```Go
 vertica://(user):(password)@(host):(port)/(database)?(queryArgs)
 ```
+
 Currently supported query arguments are:
 
 | Query Argument | Description | Values |
 |----------------|-------------|--------|
 | use_prepared_statements    | whether to use client-side query interpolation or server-side argument binding | 1 = (default) use server-side bindings |
 |                |             | 0 = user client side interpolation **(LESS SECURE)** |
+| connection_load_balance    | whether to enable connection load balancing on the client side | 0 = (default) disable load balancing |
+|                |             | 1 = enable load balancing |
 | tlsmode            | the ssl/tls policy for this connection | 'none' (default) = don't use SSL/TLS for this connection |
 |                |                                    | 'server' = server must support SSL/TLS, but skip verification **(INSECURE!)** |
 |                |                                    | 'server-strict' = server must support SSL/TLS |
@@ -137,7 +138,18 @@ With client interpolation enabled, the client library will create a new query st
 
 With client interpolation disabled (default), the client library will use the full server-side parse(), describe(), bind(), execute() cycle.
 
-### Reading query result rows.
+#### Named Arguments
+
+```Go
+rows, err := connDB.QueryContext(ctx, "SELECT name FROM MyTable WHERE id=@id and something=@example", sql.Named("id", 21), sql.Named("example", "hello"))
+```
+
+Named arguments are emulated by the driver. They will be converted to positional arguments by the driver and the named arguments given later will be slotted
+into the required positions. This still allows server side prepared statements as `@id` and `@example` above will be replaced by `?` before being sent. If
+you use named arguments, all the arguments must be named. Do not mix positional and named together. All named arguments are normalized to upper case which means
+`@param`, `@PaRaM`, and `@PARAM` are treated as equivalent.
+
+### Reading query result rows
 
 As outlined in the GoLang specs, reading the results of a query is done via a loop, bounded by a .next() iterator.
 
@@ -163,6 +175,7 @@ for _, columnName := range columnNames {
         // use the column name here.
 }
 ```
+
 ### Paging in Data
 
 By default, the query results are cached in memory allowing for rapid iteration of result row content.
@@ -188,6 +201,7 @@ defer rows.Close()
 
 // Use rows result as normal.
 ```
+
 If you want to disable paging on the same context all together, you can simply set the row
 limit to 0 (the default).
 
@@ -241,41 +255,47 @@ opts := &sql.TxOptions{
 // Begin the transaction.
 tx, err := connDB.BeginTx(ctx, opts)
 ```
+
 ```Go
 // You can either commit it.
 err = tx.Commit()
 ```
+
 ```Go
 // Or roll it back.
 err = tx.Rollback()
 ```
+
 The following transaction isolation levels are supported:
 
- * sql.LevelReadUncommitted <sup><b>&#8224;</b></sup>
- * sql.LevelReadCommitted
- * sql.LevelSerializable
- * sql.LevelRepeatableRead <sup><b>&#8224;</b></sup>
- * sql.LevelDefault
+* sql.LevelReadUncommitted <sup><b>&#8224;</b></sup>
+* sql.LevelReadCommitted
+* sql.LevelSerializable
+* sql.LevelRepeatableRead <sup><b>&#8224;</b></sup>
+* sql.LevelDefault
 
  The following transaction isolation levels are unsupported:
 
- * sql.LevelSnapshot
- * sql.LevelLinearizable
+* sql.LevelSnapshot
+* sql.LevelLinearizable
 
  <b>&#8224;</b> Although Vertica supports the grammars for these transaction isolation levels, they are internally promoted to stronger isolation levels.
 
 ## COPY modes Supported
 
 ### COPY FROM STDIN
+
 vertica-sql-go supports copying from stdin. This allows you to write a command-line tool that accepts stdin as an
 input and passes it to Vertica for processing. An example:
 
 ```go
 _, err = connDB.ExecContext(ctx, "COPY stdin_data FROM STDIN DELIMITER ','")
 ```
+
 This will process input from stdin until an EOF is reached.
 
 ### COPY FROM STDIN with alternate stream
+
 In your code, you may also supply a different io.Reader object (such as *File) from which to supply your data.
 Simply create a new VerticaContext, set the copy input stream, and provide this context to the execute call.
 An example:
@@ -363,7 +383,6 @@ func main() {
 }
 ```
 
-
 ## License
 
 Apache 2.0 License, please see `LICENSE` for details.
@@ -372,6 +391,17 @@ Apache 2.0 License, please see `LICENSE` for details.
 
 Have a bug or an idea? Please see `CONTRIBUTING.md` for details.
 
-## Acknowledgements
+### Benchmarks
 
-We would like to thank the creators and contributors of the vertica-python library, and members of the Vertica team, for their help in understanding the wire protocol.
+You can run a benchmark and profile it with a command like:
+`go test -bench '^BenchmarkRowsWithLimit$' -benchmem -memprofile memprofile.out -cpuprofile profile.out -run=none`
+
+and then explore it with `go tool pprof`. The `-run` part excludes the tests for brevity.
+
+## Acknowledgements
+* @grzm (Github)
+* @watercraft (Github)
+* @fbernier (Github)
+* @mlh758 (Github) for the awesome work filling in and enhancing the driver in many important ways.
+* Tom Wall (Vertica) for the infinite patience and deep knowledge.
+* The creators and contributors of the vertica-python library, and members of the Vertica team, for their help in understanding the wire protocol.

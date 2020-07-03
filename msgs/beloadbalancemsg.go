@@ -1,6 +1,6 @@
 package msgs
 
-// Copyright (c) 2019 Micro Focus or one of its affiliates.
+// Copyright (c) 2020 Micro Focus or one of its affiliates.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,43 +36,24 @@ import (
 	"fmt"
 )
 
-// BELoadBalanceSuccessMsg docs
-type BELoadBalanceSuccessMsg struct {
+type BELoadBalanceMsg struct {
 	Port uint32
 	Host string
 }
 
-// CreateFromMsgBody docs
-func (m *BELoadBalanceSuccessMsg) CreateFromMsgBody(buf *msgBuffer) (BackEndMsg, error) {
-
-	res := &BELoadBalanceSuccessMsg{
+// CreateFromMsgBody
+func (m *BELoadBalanceMsg) CreateFromMsgBody(buf *msgBuffer) (BackEndMsg, error) {
+	msg := &BELoadBalanceMsg{
 		Port: buf.readUint32(),
 		Host: buf.readString(),
 	}
-
-	return res, nil
+	return msg, nil
 }
 
-func (m *BELoadBalanceSuccessMsg) String() string {
-	return fmt.Sprintf("LoadBalance Success: %s:%d", m.Host, m.Port)
-}
-
-// BELoadBalanceFailMsg docs
-type BELoadBalanceFailMsg struct{}
-
-// CreateFromMsgBody docs
-func (m *BELoadBalanceFailMsg) CreateFromMsgBody(buf *msgBuffer) (BackEndMsg, error) {
-
-	res := &BELoadBalanceFailMsg{}
-
-	return res, nil
-}
-
-func (m *BELoadBalanceFailMsg) String() string {
-	return fmt.Sprintf("LoadBalance Fail")
+func (m *BELoadBalanceMsg) String() string {
+	return fmt.Sprintf("LoadBalanceResponse: host=%s, port=%d", m.Host, m.Port)
 }
 
 func init() {
-	registerBackEndMsgType('Y', &BELoadBalanceSuccessMsg{})
-	registerBackEndMsgType('N', &BELoadBalanceFailMsg{})
+	registerBackEndMsgType('Y', &BELoadBalanceMsg{})
 }

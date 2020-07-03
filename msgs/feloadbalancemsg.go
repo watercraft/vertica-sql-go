@@ -1,6 +1,6 @@
 package msgs
 
-// Copyright (c) 2019 Micro Focus or one of its affiliates.
+// Copyright (c) 2020 Micro Focus or one of its affiliates.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,5 +47,5 @@ func (m *FELoadBalanceMsg) Flatten() ([]byte, byte) {
 }
 
 func (m *FELoadBalanceMsg) String() string {
-	return "LoadBalance: (packet)"
+	return "LoadBalanceRequest"
 }

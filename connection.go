@@ -43,7 +43,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -161,9 +160,6 @@ func (v *connection) ResetSession(ctx context.Context) error {
 	return v.Ping(ctx)
 }
 
-// Custome dialer parameters
-var dialer = &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 4 * time.Second}
-
 // newConnection constructs a new Vertica Connection object based on the connection string.
 func newConnection(connString string) (*connection, error) {
 
@@ -184,20 +180,22 @@ func newConnection(connString string) (*connection, error) {
 		result.usePreparedStmts = iFlag == "1"
 	}
 
+	// Read connection load balance flag.
+	loadBalanceFlag := result.connURL.Query().Get("connection_load_balance")
+
 	sslFlag := strings.ToLower(result.connURL.Query().Get("tlsmode"))
 	if sslFlag == "" {
 		sslFlag = "none"
 	}
 
-	result.conn, err = dialer.Dial("tcp", result.connURL.Host)
+	result.conn, err = net.Dial("tcp", result.connURL.Host)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to %s (%s)", result.connURL.Host, err.Error())
 	}
 
 	// Load Balancing
-	loadbalance, _ := strconv.Atoi(result.connURL.Query().Get("loadbalance"))
-	if loadbalance > 0 {
+	if loadBalanceFlag == "1" {
 		if err = result.balanceLoad(); err != nil {
 			return nil, err
 		}
@@ -262,23 +260,27 @@ func (v *connection) recvMessage() (msgs.BackEndMsg, error) {
 }
 
 func (v *connection) sendMessage(msg msgs.FrontEndMsg) error {
+	return v.sendMessageTo(msg, v.conn)
+}
+
+func (v *connection) sendMessageTo(msg msgs.FrontEndMsg, conn net.Conn) error {
 	var result error = nil
 
 	msgBytes, msgTag := msg.Flatten()
 
 	if msgTag != 0 {
-		_, result = v.conn.Write([]byte{msgTag})
+		_, result = conn.Write([]byte{msgTag})
 	}
 
 	if result == nil {
 		sizeBytes := v.scratch[:4]
 		binary.BigEndian.PutUint32(sizeBytes, uint32(len(msgBytes)+4))
 
-		_, result = v.conn.Write(sizeBytes)
+		_, result = conn.Write(sizeBytes)
 
 		if result == nil {
 			if len(msgBytes) > 0 {
-				_, result = v.conn.Write(msgBytes)
+				_, result = conn.Write(msgBytes)
 			}
 		}
 	}
@@ -367,12 +369,14 @@ func (v *connection) initializeSession() error {
 		return err
 	}
 
-	if len(result.Columns()) != 1 && result.Columns()[1] != "now" || len(result.resultData) != 1 {
+	firstRow := result.resultData.Peek()
+
+	if len(result.Columns()) != 1 && result.Columns()[1] != "now" || firstRow == nil {
 		return fmt.Errorf("unable to initialize session; functionality may be unreliable")
 	}
 
 	// Peek into the results manually.
-	colData := result.resultData[0].Columns()
+	colData := firstRow.Columns()
 	str := string(colData.Chunk())
 
 	if len(str) < 23 {
@@ -409,6 +413,8 @@ func (v *connection) defaultMessageHandler(bMsg msgs.BackEndMsg) (bool, error) {
 		}
 	case *msgs.BENoticeMsg:
 		break
+	case *msgs.BEParamStatusMsg:
+		connectionLogger.Debug("%v", msg)
 	default:
 		handled = false
 		err = fmt.Errorf("unhandled message: %v", msg)
@@ -434,6 +440,67 @@ func (v *connection) readAll(buf []byte) error {
 			return nil
 		}
 	}
+}
+
+func (v *connection) balanceLoad() error {
+	v.sendMessage(&msgs.FELoadBalanceMsg{})
+	response := v.scratch[:1]
+
+	var err error
+	if err = v.readAll(response); err != nil {
+		return err
+	}
+
+	if response[0] == 'N' {
+		// keep existing connection
+		connectionLogger.Debug("<- LoadBalanceResponse: N")
+		connectionLogger.Warn("Load balancing requested but not supported by server")
+		return nil
+	}
+
+	if response[0] != 'Y' {
+		connectionLogger.Debug("<- LoadBalanceResponse: %c", response[0])
+		return fmt.Errorf("Load balancing request gave unknown response: %c", response[0])
+	}
+
+	header := v.scratch[1:5]
+	if err = v.readAll(header); err != nil {
+		return err
+	}
+	msgSize := int(binary.BigEndian.Uint32(header) - 4)
+	msgBytes := v.scratch[5:]
+
+	var y []byte
+	if msgSize > 0 {
+		if msgSize <= len(msgBytes) {
+			y = msgBytes[:msgSize]
+		} else {
+			y = make([]byte, msgSize)
+		}
+		if err = v.readAll(y); err != nil {
+			return err
+		}
+	}
+
+	bem, err := msgs.CreateBackEndMsg(response[0], y)
+	if err != nil {
+		return err
+	}
+	connectionLogger.Debug("<- " + bem.String())
+	msg := bem.(*msgs.BELoadBalanceMsg)
+
+	// v.connURL.Hostname() is used by initializeSSL(), so load balancing info should not write into v.connURL
+	loadBalanceAddr := fmt.Sprintf("%s:%d", msg.Host, msg.Port)
+
+	// Connect to new host
+	v.conn.Close()
+	v.conn, err = net.Dial("tcp", loadBalanceAddr)
+
+	if err != nil {
+		return fmt.Errorf("cannot redirect to %s (%s)", loadBalanceAddr, err.Error())
+	}
+
+	return nil
 }
 
 func (v *connection) initializeSSL(sslFlag string) error {
@@ -518,7 +585,28 @@ func (v *connection) authSendSHA512Password(extraAuthData []byte) error {
 }
 
 func (v *connection) sync() error {
-	return v.sendMessage(&msgs.FESyncMsg{})
+	err := v.sendMessage(&msgs.FESyncMsg{})
+
+	if err != nil {
+		return err
+	}
+
+	for true {
+		bem, err := v.recvMessage()
+		if err != nil {
+			return err
+		}
+
+		_, ok := bem.(*msgs.BEReadyForQueryMsg)
+
+		if ok {
+			break
+		}
+
+		_, _ = v.defaultMessageHandler(bem)
+	}
+
+	return nil
 }
 
 func (v *connection) lockSessionMutex() {
@@ -527,42 +615,4 @@ func (v *connection) lockSessionMutex() {
 
 func (v *connection) unlockSessionMutex() {
 	v.sessMutex.Unlock()
-}
-
-func (v *connection) balanceLoad() error {
-
-	if err := v.sendMessage(&msgs.FELoadBalanceMsg{}); err != nil {
-		return err
-	}
-
-	bMsg, err := v.recvMessage()
-	if err != nil {
-		return err
-	}
-
-	switch msg := bMsg.(type) {
-	case *msgs.BEErrorMsg:
-		return msg.ToErrorType()
-	case *msgs.BELoadBalanceSuccessMsg:
-		v.conn.Close()
-		newURL, err := url.Parse(fmt.Sprintf("vertica://%s:%d", msg.Host, msg.Port))
-		if err != nil {
-			return err
-		}
-		v.conn, err = dialer.Dial("tcp", newURL.Host)
-		if err != nil {
-			return fmt.Errorf("cannot connect to %s (%s)", newURL.Host, err.Error())
-		}
-		return nil
-	case *msgs.BELoadBalanceFailMsg:
-		// keep existing connection
-		return nil
-	default:
-		_, err = v.defaultMessageHandler(msg)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
