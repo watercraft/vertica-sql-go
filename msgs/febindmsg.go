@@ -84,6 +84,8 @@ func (m *FEBindMsg) Flatten() ([]byte, byte) {
 			continue
 		case time.Time:
 			strVal = v.Format("2006-01-02T15:04:05.999999Z07:00")
+		case []uint8:
+			strVal = string(v)
 		default:
 			strVal = "??HELP??"
 		}

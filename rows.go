@@ -35,7 +35,6 @@ package vertigo
 import (
 	"context"
 	"database/sql/driver"
-	"encoding/hex"
 	"io"
 	"strconv"
 	"strings"
@@ -112,7 +111,7 @@ func (r *rows) Next(dest []driver.Value) error {
 		case common.ColTypeTimestampTZ:
 			dest[idx], _ = parseTimestampTZColumn(string(colVal))
 		case common.ColTypeVarBinary, common.ColTypeLongVarBinary, common.ColTypeBinary: // to []byte - this one's easy
-			dest[idx] = hex.EncodeToString(colVal)
+			dest[idx] = colVal
 		default:
 			dest[idx] = string(colVal)
 		}
