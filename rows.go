@@ -110,8 +110,25 @@ func (r *rows) Next(dest []driver.Value) error {
 			dest[idx], _ = parseTimestampTZColumn(string(colVal) + r.tzOffset)
 		case common.ColTypeTimestampTZ:
 			dest[idx], _ = parseTimestampTZColumn(string(colVal))
-		case common.ColTypeVarBinary, common.ColTypeLongVarBinary, common.ColTypeBinary: // to []byte - this one's easy
-			dest[idx] = colVal
+		case common.ColTypeVarBinary, common.ColTypeLongVarBinary, common.ColTypeBinary:
+			// to []byte; convert escaped octal (eg \261) into byte with \\ for \
+			var out []byte
+			for len(colVal) > 0 {
+				c := colVal[0]
+				if c == '\\' && len(colVal) > 3 {
+					if colVal[1] == '\\' {
+						colVal = colVal[2:]
+					} else {
+						x, _ := strconv.ParseInt(string(colVal[1:4]), 8, 32)
+						c = byte(x)
+						colVal = colVal[4:]
+					}
+				} else {
+					colVal = colVal[1:]
+				}
+				out = append(out, c)
+			}
+			dest[idx] = out
 		default:
 			dest[idx] = string(colVal)
 		}
