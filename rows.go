@@ -115,7 +115,7 @@ func (r *rows) Next(dest []driver.Value) error {
 			var out []byte
 			for len(colVal) > 0 {
 				c := colVal[0]
-				if c == '\\' && len(colVal) > 3 {
+				if c == '\\' {
 					if colVal[1] == '\\' {
 						colVal = colVal[2:]
 					} else {
