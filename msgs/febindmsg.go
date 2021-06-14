@@ -33,6 +33,7 @@ package msgs
 // THE SOFTWARE.
 
 import (
+	"bytes"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
@@ -85,7 +86,10 @@ func (m *FEBindMsg) Flatten() ([]byte, byte) {
 		case time.Time:
 			strVal = v.Format("2006-01-02T15:04:05.999999Z07:00")
 		case []uint8:
-			strVal = string(v)
+			v = bytes.ReplaceAll(v, []byte("\\"), []byte("\\134"))
+			buf.appendUint32(uint32(len(v)))
+			buf.appendBytes(v)
+			continue
 		default:
 			strVal = "??HELP??"
 		}
